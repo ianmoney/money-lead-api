@@ -1,0 +1,31 @@
+{
+  "project": "money-lead-api",
+  "updated": "2026-09-02",
+  "phase": "frontend-foundation",
+  "production_live": false,
+  "scores": {
+    "architecture": { "score": 7, "status": "self-reviewed; independent critic not run" },
+    "security_privacy": { "score": 5, "status": "contracts drafted; backend repository unavailable" },
+    "api_reliability": { "score": 4, "status": "upstream screenshot reviewed; backend implementation unavailable" },
+    "ux_brand": { "score": 8, "status": "implemented and browser-checked at 320px and 390px; production design review pending" },
+    "conversion_measurement": { "score": 6, "status": "safe event adapter implemented; live analytics destination pending" },
+    "accessibility_performance": { "score": 7, "status": "native controls, focus states and no 320px overflow verified; formal audit pending" }
+  },
+  "hard_gates": {
+    "legacy_typeform_verified": false,
+    "real_device_otp_uat": false,
+    "money_admin_staging_lead_verified": false,
+    "preview_deployment_verified": false,
+    "approved_legal_copy_present": false,
+    "production_mappings_confirmed": false
+  },
+  "evidence": [
+    "Money brand PDF reviewed",
+    "Money Admin API screenshot reviewed",
+    "reference form desktop and 390x844 layout inspected",
+    "current Money health-insurance page and matching-engine first step inspected",
+    "reusable full-page and inline frontend implemented",
+    "choice and two-stage birth-year interactions browser-checked at mobile widths"
+  ],
+  "next_action": "Implement the security-critical backend in this repository and obtain approved production configuration for staging UAT."
+}

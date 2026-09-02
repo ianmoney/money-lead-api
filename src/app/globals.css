@@ -1,0 +1,15 @@
+:root {
+  --money-purple-50: #f3eeff; --money-purple-100: #d5c6ff; --money-purple-500: #3f00de;
+  --money-purple-600: #3900ca; --money-purple-800: #23007a; --money-blue-500: #85e8ff;
+  --money-blue-700: #00a2c7; --money-ink: #0e0d0f; --money-body: #464547;
+  --money-muted: #6b6a6c; --money-border: rgba(52, 42, 77, 0.16); --money-surface: #fff;
+  --money-screen: #f7f6fa; --font-heading: "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Helvetica Neue", Arial, sans-serif; --shadow-card: 0 18px 50px rgba(35,0,122,.09);
+}
+* { box-sizing: border-box; }
+html { min-width: 320px; min-height: 100%; background: var(--money-screen); }
+body { min-height: 100%; margin: 0; color: var(--money-ink); background: var(--money-screen); font: 18px/1.45 var(--font-body); -webkit-font-smoothing: antialiased; }
+button, input { font: inherit; }
+button, a, input, label { -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 4px solid var(--money-blue-500); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { transition-duration: .01ms !important; animation-duration: .01ms !important; } }
