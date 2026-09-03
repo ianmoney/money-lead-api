@@ -21,9 +21,9 @@ type Provider = (typeof providerOptions)[number];
 
 export type MoneyHealthInsuranceMapping = {
   /**
-   * Values must come from Money API-owner or staging evidence. The current
-   * public form does not collect gender, while the supplied example value is
-   * gender-specific, so this mapping intentionally has no defaults.
+   * Values must come from Money API-owner or staging evidence. Individual
+   * examples are gender-specific, while the public form does not currently
+   * collect gender, so this mapping intentionally has no defaults.
    */
   coverageTypeByCoverFor: Partial<Record<CoverFor, string>>;
   providerAccountIdByFund?: Partial<Record<Provider, string>>;
@@ -32,7 +32,15 @@ export type MoneyHealthInsuranceMapping = {
 
 export type MoneyHealthInsuranceSupplementalAnswers = {
   partnerDob?: string | null;
-  dependents?: string[] | null;
+  dependents?: unknown[] | null;
+  taxableIncome?: number | string | null;
+  rebateLabel?: string | null;
+  reasonsForCover?: string | string[] | null;
+  hospitalServices?: string[] | null;
+  extraServices?: string[] | null;
+  hospitalServiceClassification?: string | null;
+  boContinuousCover?: boolean | null;
+  campaign?: string | null;
 };
 
 const COVER_TYPE_BY_LABEL: Record<CoverType, MoneyHealthInsuranceScenarioRequest["cover_type"]> = {
@@ -92,8 +100,9 @@ function moneyProviderAccountId(
   return accountId;
 }
 
-function moneyReferrer(attribution: Attribution) {
+function moneyReferrer(attribution: Attribution, campaign?: string | null) {
   return {
+    campaign: campaign ?? null,
     ga_client_id: null,
     gclid: attribution.gclid,
     fbclid: attribution.fbclid,
@@ -142,22 +151,23 @@ export function buildMoneyHealthInsuranceScenario(
   return {
     coverage_type: coverageType,
     cover_type: moneyCoverTypeFromLabel(answers.cover_type),
-    reasons_for_cover: null,
+    reasons_for_cover: supplemental.reasonsForCover ?? [],
     dob: birthYearToMoneyDob(answers.birth_year),
     partner_dob: assertIsoDateOrNull(supplemental.partnerDob, "Partner DOB"),
-    dependents: supplemental.dependents ?? null,
+    dependents: supplemental.dependents ?? [],
     state: answers.state as MoneyState,
-    taxable_income: null,
-    hospital_service_classification: null,
+    taxable_income: supplemental.taxableIncome ?? null,
+    rebate_label: supplemental.rebateLabel ?? null,
+    hospital_service_classification: supplemental.hospitalServiceClassification ?? null,
     current_provider_account_id: moneyProviderAccountId(answers.current_health_fund, mapping),
-    hospital_services: null,
-    extra_services: null,
+    hospital_services: supplemental.hospitalServices ?? [],
+    extra_services: supplemental.extraServices ?? [],
     contact_first_name: answers.first_name.trim(),
     contact_last_name: answers.last_name.trim(),
     contact_email: answers.email.trim().toLowerCase(),
     contact_phone: moneyContactPhone(answers.phone, mapping),
     mobile_code: null,
-    bo_continuous_cover: null,
-    referrer: moneyReferrer(attribution),
+    bo_continuous_cover: supplemental.boContinuousCover ?? null,
+    referrer: moneyReferrer(attribution, supplemental.campaign),
   };
 }
