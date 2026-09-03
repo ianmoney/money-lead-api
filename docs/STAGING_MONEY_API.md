@@ -1,6 +1,6 @@
 # Money staging API integration
 
-Status: OAuth client and typed health-insurance scenario client implemented on the staging integration branch. Public lead submission remains fail-closed until the unresolved upstream mappings and verification backend are completed.
+Status: OAuth client, typed health-insurance scenario client, fail-closed adapter and protected preview-only scenario probe are implemented on the staging integration branch. Public lead submission remains fail-closed until the unresolved upstream mappings and verification backend are completed.
 
 ## Confirmed staging configuration
 
@@ -25,6 +25,19 @@ The Money Admin API screenshot confirms the health-insurance scenario endpoint a
 POST /v1/funnels/health-insurance
 ```
 
+## Additional staging/contact payload evidence
+
+A later supplied payload establishes or strongly suggests the following request behaviour:
+
+- individual coverage values can be gender-specific; examples now include `JUST_YOU_MALE` and `JUST_YOU_FEMALE`
+- Money accepts local Australian mobile representation such as `04...`
+- `hospital_services`, `extra_services`, `reasons_for_cover` and `dependents` may be sent as empty arrays
+- `taxable_income` may be sent as a string even though earlier Admin material showed a numeric representation
+- `rebate_label` is accepted by the supplied flow despite being absent from the earlier Admin screenshot
+- `referrer` may carry Google/Meta click IDs, UTMs, GA client ID and an HTTP referrer
+
+The supplied provider UUID is not mapped to a health fund because the evidence does not explicitly establish that relationship.
+
 ## Code added
 
 `src/server/money/client.ts`
@@ -35,6 +48,8 @@ POST /v1/funnels/health-insurance
 - caches the token in-process only when an `expires_in` value is returned
 - adds an `Authorization: <token_type> <access_token>` header to the scenario request
 - exposes a typed `createMoneyHealthInsuranceScenario()` function
+- accepts only observed type inconsistencies such as numeric-or-string `taxable_income` and string-or-array `reasons_for_cover`
+- extracts a small, redacted field/message list from `422` responses for the internal staging probe
 - uses a 12 second timeout and stable integration errors
 - never logs or returns the client secret or access token
 
@@ -44,6 +59,8 @@ POST /v1/funnels/health-insurance
 - converts the selected birth year to 1 January in ISO format
 - maps Hospital Only, Hospital & Extras and Extras Only to the two Money booleans
 - maps contact and allowlisted attribution fields
+- supports explicit supplemental staging fields such as income, rebate label, reasons, service arrays and continuous-cover value without inventing them
+- defaults confirmed empty-list fields to arrays rather than `null`
 - requires confirmed coverage, provider and phone-format configuration and fails closed when it is absent
 - accepts partner DOB and dependant values only as explicit supplemental data; it does not invent them
 
@@ -54,27 +71,44 @@ POST /v1/funnels/health-insurance
 - if `INTERNAL_HEALTHCHECK_KEY` is set, callers must send the same value in `x-internal-healthcheck-key`
 - in production mode, the route fails closed if `INTERNAL_HEALTHCHECK_KEY` is not configured
 
+`src/app/api/internal/money-scenario-probe/route.ts`
+
+- accepts `POST` only
+- exists only on Vercel Preview deployments (`VERCEL_ENV=preview`); elsewhere it returns `404`
+- refuses to run unless `MONEY_API_BASE_URL` resolves exactly to `https://api-staging.money.com.au`
+- always requires `INTERNAL_HEALTHCHECK_KEY`
+- submits one hard-coded synthetic `JUST_YOU_MALE` QLD Hospital Only scenario
+- uses `staging-probe@example.invalid` and ACMA-reserved fictional mobile `0491 570 156`
+- sends empty arrays where the supplied payload showed arrays
+- sends no provider account ID
+- returns only `scenario_id` on success
+- returns a capped, redacted validation issue list for `422` responses and never returns the upstream request body or OAuth token
+
 ## Vercel variables
 
-Already supplied by the project owner:
+Already supplied by the project owner in Production scope:
 
 ```text
 ClientID=<saved in Vercel>
 ClientSecret=<saved in Vercel>
 ```
 
-Recommended additional staging variables:
+Required for the protected PR Preview before testing:
 
 ```text
+ClientID=<same credential, protected Preview scope>
+ClientSecret=<same credential, protected Preview scope>
 MONEY_API_BASE_URL=https://api-staging.money.com.au
-INTERNAL_HEALTHCHECK_KEY=<random staging-only secret>
+INTERNAL_HEALTHCHECK_KEY=<random Preview-only secret>
 ```
 
 Do not prefix any of these with `NEXT_PUBLIC_`.
 
+The Preview-scoped changes above require explicit project-owner approval before they are made.
+
 ## Staging auth smoke test
 
-After deploying the branch to a protected Vercel Preview/Staging deployment, call:
+After the variables are approved and a fresh Preview deployment is created, call:
 
 ```text
 GET /api/internal/money-auth-check
@@ -93,21 +127,39 @@ Expected success response:
 
 The returned `token_type` may differ if the OAuth service specifies another scheme. The access token itself is never returned.
 
+## Staging scenario validation probe
+
+Only after OAuth succeeds, call:
+
+```text
+POST /api/internal/money-scenario-probe
+x-internal-healthcheck-key: <INTERNAL_HEALTHCHECK_KEY>
+```
+
+The probe intentionally uses a synthetic payload and no provider UUID. A `422` is useful evidence: record only the redacted field/message output and use it to refine the typed contract. A success response returns the generated `scenario_id`; verify that ID in Money Admin staging before treating the scenario creation path as confirmed.
+
 ## What is intentionally not wired to the public form yet
 
-The confirmed DOB and hospital/extras transformations are now implemented in a server-only adapter. The form still collects a smaller user-friendly set of fields than the Money scenario API, and the remaining production mappings have not been supplied. In particular, do not guess:
+Do not guess:
 
-- complete `coverage_type` values and the mapping from `Individual`, `Couple`, `Family`; the supplied example `JUST_YOU_FEMALE` indicates gender may be required, but the form does not collect it
-- `current_provider_account_id` values and the mapping from provider labels
-- whether `partner_dob` or `dependents` must be supplied for Couple or Family, given that the form currently collects one birth year only
-- whether `reasons_for_cover`, hospital-service classification, taxable income, hospital services, extras services and other optional-looking fields are actually required for the staging business flow
-- exact upstream phone representation
+- the complete `coverage_type` enum or Couple/Family values
+- whether the public form must add a gender question
+- whether Couple/Family require `partner_dob` or dependant DOB data
+- provider account IDs or the supplied UUID's provider identity
+- whether `taxable_income` and `rebate_label` are required in all flows
+- the canonical type and allowed values for `reasons_for_cover`
+- whether `bo_continuous_cover` should be inferred from having a current fund
 - any upstream idempotency header
-
-The supplied Admin screenshot confirms the field names and response shape, but not enough business rules to safely transform the existing form end-to-end.
+- whether successful scenario creation is the final lead-acceptance event
 
 The public flow also still needs the first-party OTP/verification proof, durable expiring state, idempotency, Turnstile verification and associated tests described in `ARCHITECTURE.md` and `docs/API_CONTRACTS.md`.
 
 ## Next implementation step
 
-Once the Money API owner confirms the missing mappings, configure the fail-closed server adapter and then call `createMoneyHealthInsuranceScenario()` only after successful phone verification and idempotency checks. Verify the resulting `scenario_id` appears in the Money Admin staging environment before enabling any paid traffic.
+1. Obtain explicit approval for the protected Preview-scoped Vercel variables.
+2. Redeploy the branch Preview.
+3. Run the OAuth smoke test.
+4. Run the protected synthetic scenario probe.
+5. Use redacted staging validation evidence to resolve request mappings.
+6. Verify any successful `scenario_id` in Money Admin staging.
+7. Keep the public form disconnected until verification, durable state, idempotency and strict fail-closed validation are implemented and reviewed.
