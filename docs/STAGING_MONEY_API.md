@@ -38,6 +38,15 @@ POST /v1/funnels/health-insurance
 - uses a 12 second timeout and stable integration errors
 - never logs or returns the client secret or access token
 
+`src/server/money/health-insurance-adapter.ts`
+
+- validates the existing form enums before transformation
+- converts the selected birth year to 1 January in ISO format
+- maps Hospital Only, Hospital & Extras and Extras Only to the two Money booleans
+- maps contact and allowlisted attribution fields
+- requires confirmed coverage, provider and phone-format configuration and fails closed when it is absent
+- accepts partner DOB and dependant values only as explicit supplemental data; it does not invent them
+
 `src/app/api/internal/money-auth-check/route.ts`
 
 - provides a narrow staging diagnostic that tests OAuth only
@@ -86,10 +95,11 @@ The returned `token_type` may differ if the OAuth service specifies another sche
 
 ## What is intentionally not wired to the public form yet
 
-The form currently collects a small user-friendly set of fields, while the Money scenario API expects fields whose exact production mappings have not been supplied. In particular, do not guess:
+The confirmed DOB and hospital/extras transformations are now implemented in a server-only adapter. The form still collects a smaller user-friendly set of fields than the Money scenario API, and the remaining production mappings have not been supplied. In particular, do not guess:
 
-- complete `coverage_type` values and the mapping from `Individual`, `Couple`, `Family`
+- complete `coverage_type` values and the mapping from `Individual`, `Couple`, `Family`; the supplied example `JUST_YOU_FEMALE` indicates gender may be required, but the form does not collect it
 - `current_provider_account_id` values and the mapping from provider labels
+- whether `partner_dob` or `dependents` must be supplied for Couple or Family, given that the form currently collects one birth year only
 - whether `reasons_for_cover`, hospital-service classification, taxable income, hospital services, extras services and other optional-looking fields are actually required for the staging business flow
 - exact upstream phone representation
 - any upstream idempotency header
@@ -100,4 +110,4 @@ The public flow also still needs the first-party OTP/verification proof, durable
 
 ## Next implementation step
 
-Once the Money API owner confirms the missing mappings, add a server-side adapter from the existing `LeadAnswers` model to `MoneyHealthInsuranceScenarioRequest`, then call `createMoneyHealthInsuranceScenario()` only after successful phone verification and idempotency checks. Verify the resulting `scenario_id` appears in the Money Admin staging environment before enabling any paid traffic.
+Once the Money API owner confirms the missing mappings, configure the fail-closed server adapter and then call `createMoneyHealthInsuranceScenario()` only after successful phone verification and idempotency checks. Verify the resulting `scenario_id` appears in the Money Admin staging environment before enabling any paid traffic.

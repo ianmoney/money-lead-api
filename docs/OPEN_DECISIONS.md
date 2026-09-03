@@ -6,6 +6,7 @@ Unresolved items fail closed; they are not inferred from examples.
 | --- | --- | --- | --- |
 | OD-01 | Complete production `coverage_type` enum | Admin screenshot confirms field and one example only | Money API owner supplies full enum/mapping |
 | OD-02 | Provider account IDs and whether required | Field is `current_provider_account_id`; no mapping supplied | Money API owner supplies approved list |
+| OD-03 | Gender and partner/dependant DOB mapping | Example coverage value is gender-specific; form collects one birth year only | Confirm whether gender is required and whether Couple/Family require `partner_dob` or `dependents` |
 | OD-04 | Upstream phone representation | Public verification contract uses E.164; upstream requirement unconfirmed | Money API owner confirms |
 | OD-05 | Upstream idempotency header | Not supplied | Money API owner confirms; internal idempotency still required |
 | OD-06 | Required scenario/request fields | Screenshot confirms shape, not all business requirements | Staging validation with API owner |

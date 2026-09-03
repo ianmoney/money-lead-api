@@ -1,0 +1,163 @@
+import "server-only";
+
+import type { Attribution } from "@/features/health-quote/analytics";
+import {
+  coverForOptions,
+  coverTypeOptions,
+  providerOptions,
+  stateOptions,
+  type LeadAnswers,
+} from "@/features/health-quote/schema";
+import { normalizeAustralianMobile } from "@/features/health-quote/validation";
+import {
+  MoneyApiError,
+  type MoneyHealthInsuranceScenarioRequest,
+  type MoneyState,
+} from "./client";
+
+type CoverFor = (typeof coverForOptions)[number];
+type CoverType = (typeof coverTypeOptions)[number];
+type Provider = (typeof providerOptions)[number];
+
+export type MoneyHealthInsuranceMapping = {
+  /**
+   * Values must come from Money API-owner or staging evidence. The current
+   * public form does not collect gender, while the supplied example value is
+   * gender-specific, so this mapping intentionally has no defaults.
+   */
+  coverageTypeByCoverFor: Partial<Record<CoverFor, string>>;
+  providerAccountIdByFund?: Partial<Record<Provider, string>>;
+  contactPhoneFormat?: "E164" | "AU_LOCAL";
+};
+
+export type MoneyHealthInsuranceSupplementalAnswers = {
+  partnerDob?: string | null;
+  dependents?: string[] | null;
+};
+
+const COVER_TYPE_BY_LABEL: Record<CoverType, MoneyHealthInsuranceScenarioRequest["cover_type"]> = {
+  "Hospital Only": { hospital: true, extras: false },
+  "Hospital & Extras": { hospital: true, extras: true },
+  "Extras Only": { hospital: false, extras: true },
+};
+
+function isOneOf<T extends readonly string[]>(values: T, value: string): value is T[number] {
+  return values.includes(value as T[number]);
+}
+
+function mappingRequired(message: string): never {
+  throw new MoneyApiError("MAPPING_REQUIRED", message);
+}
+
+function assertIsoDateOrNull(value: string | null | undefined, field: string) {
+  if (value == null) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new MoneyApiError("INVALID_REQUEST", `${field} must use YYYY-MM-DD format.`);
+  }
+  return value;
+}
+
+export function birthYearToMoneyDob(birthYear: string, currentYear = new Date().getFullYear()) {
+  if (!/^\d{4}$/.test(birthYear)) {
+    throw new MoneyApiError("INVALID_REQUEST", "Birth year must contain four digits.");
+  }
+
+  const year = Number(birthYear);
+  if (year < 1900 || year > currentYear) {
+    throw new MoneyApiError("INVALID_REQUEST", "Birth year is outside the supported range.");
+  }
+
+  return `${birthYear}-01-01`;
+}
+
+export function moneyCoverTypeFromLabel(label: string) {
+  if (!isOneOf(coverTypeOptions, label)) {
+    throw new MoneyApiError("INVALID_REQUEST", "Health cover type is not supported.");
+  }
+
+  return { ...COVER_TYPE_BY_LABEL[label] };
+}
+
+function moneyProviderAccountId(
+  provider: Provider,
+  mapping: MoneyHealthInsuranceMapping,
+) {
+  if (provider === "No current fund" || provider === "Other") return null;
+
+  const accountId = mapping.providerAccountIdByFund?.[provider]?.trim();
+  if (!accountId) {
+    return mappingRequired(`Money provider account ID is not configured for ${provider}.`);
+  }
+
+  return accountId;
+}
+
+function moneyReferrer(attribution: Attribution) {
+  return {
+    ga_client_id: null,
+    gclid: attribution.gclid,
+    fbclid: attribution.fbclid,
+    utm_source: attribution.utm_source,
+    utm_medium: attribution.utm_medium,
+    utm_campaign: attribution.utm_campaign,
+    utm_content: attribution.utm_content,
+    utm_term: attribution.utm_term,
+    http_referrer: attribution.referrer,
+  };
+}
+
+function moneyContactPhone(phone: string, mapping: MoneyHealthInsuranceMapping) {
+  const normalized = normalizeAustralianMobile(phone);
+  if (!normalized) {
+    throw new MoneyApiError("INVALID_REQUEST", "Contact phone must be an Australian mobile number.");
+  }
+
+  if (mapping.contactPhoneFormat === "E164") return normalized;
+  if (mapping.contactPhoneFormat === "AU_LOCAL") return `0${normalized.slice(3)}`;
+
+  return mappingRequired("Money contact phone format is not configured.");
+}
+
+export function buildMoneyHealthInsuranceScenario(
+  answers: LeadAnswers,
+  attribution: Attribution,
+  mapping: MoneyHealthInsuranceMapping,
+  supplemental: MoneyHealthInsuranceSupplementalAnswers = {},
+): MoneyHealthInsuranceScenarioRequest {
+  if (!isOneOf(coverForOptions, answers.cover_for)) {
+    throw new MoneyApiError("INVALID_REQUEST", "Health coverage selection is not supported.");
+  }
+  if (!isOneOf(providerOptions, answers.current_health_fund)) {
+    throw new MoneyApiError("INVALID_REQUEST", "Current health fund is not supported.");
+  }
+  if (!isOneOf(stateOptions, answers.state)) {
+    throw new MoneyApiError("INVALID_REQUEST", "State or territory is not supported.");
+  }
+
+  const coverageType = mapping.coverageTypeByCoverFor[answers.cover_for]?.trim();
+  if (!coverageType) {
+    return mappingRequired(`Money coverage type is not configured for ${answers.cover_for}.`);
+  }
+
+  return {
+    coverage_type: coverageType,
+    cover_type: moneyCoverTypeFromLabel(answers.cover_type),
+    reasons_for_cover: null,
+    dob: birthYearToMoneyDob(answers.birth_year),
+    partner_dob: assertIsoDateOrNull(supplemental.partnerDob, "Partner DOB"),
+    dependents: supplemental.dependents ?? null,
+    state: answers.state as MoneyState,
+    taxable_income: null,
+    hospital_service_classification: null,
+    current_provider_account_id: moneyProviderAccountId(answers.current_health_fund, mapping),
+    hospital_services: null,
+    extra_services: null,
+    contact_first_name: answers.first_name.trim(),
+    contact_last_name: answers.last_name.trim(),
+    contact_email: answers.email.trim().toLowerCase(),
+    contact_phone: moneyContactPhone(answers.phone, mapping),
+    mobile_code: null,
+    bo_continuous_cover: null,
+    referrer: moneyReferrer(attribution),
+  };
+}

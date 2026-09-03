@@ -1,3 +1,5 @@
+import "server-only";
+
 const DEFAULT_MONEY_API_BASE_URL = "https://api-staging.money.com.au";
 const TOKEN_PATH = "/oauth/token";
 const HEALTH_INSURANCE_SCENARIO_PATH = "/v1/funnels/health-insurance";
