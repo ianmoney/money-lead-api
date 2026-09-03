@@ -4,14 +4,44 @@ All public responses use JSON, a stable `code`, a user-safe `message` and an int
 
 ## Confirmed upstream Money contract
 
-The supplied Money Admin screenshot confirms:
+The supplied Money Admin material and later staging/contact payload confirm:
 
-- `POST https://api.money.com.au/v1/funnels/health-insurance`
-- request fields including `coverage_type`, `cover_type.hospital`, `cover_type.extras`, `reasons_for_cover`, `dob`, `partner_dob`, `dependents`, `state`, `taxable_income`, `hospital_service_classification`, `current_provider_account_id`, `hospital_services`, `extra_services`, `contact_first_name`, `contact_last_name`, `contact_email`, `contact_phone`, `mobile_code`, `bo_continuous_cover` and `referrer`
+- staging base URL: `https://api-staging.money.com.au`
+- scenario endpoint: `POST /v1/funnels/health-insurance`
+- request fields including `coverage_type`, `cover_type.hospital`, `cover_type.extras`, `reasons_for_cover`, `dob`, `partner_dob`, `dependents`, `state`, `taxable_income`, `rebate_label`, `hospital_service_classification`, `current_provider_account_id`, `hospital_services`, `extra_services`, `contact_first_name`, `contact_last_name`, `contact_email`, `contact_phone`, `mobile_code`, `bo_continuous_cover` and `referrer`
 - allowed state abbreviations: `ACT`, `NSW`, `NT`, `QLD`, `SA`, `TAS`, `VIC`, `WA`
+- individual `coverage_type` examples include `JUST_YOU_MALE` and `JUST_YOU_FEMALE`
+- local Australian mobile representation such as `04...` is accepted in the supplied payload
+- empty service selections, reasons and dependants may be arrays
+- `taxable_income` has been observed as both number-like documentation and a string payload, so the staging client accepts number or string pending canonical-contract confirmation
 - response contains `scenario_id` and `matchmaker_results`
 
-The screenshot shows an example `coverage_type` value but does not establish the complete enum. Production mappings remain configuration-backed and fail closed.
+The complete `coverage_type` enum, Couple/Family requirements, provider UUID mapping, canonical `reasons_for_cover` type, continuous-cover rule and final lead-acceptance semantics are not yet established. Production mappings remain configuration-backed and fail closed.
+
+## Internal staging diagnostics
+
+### OAuth health check
+
+`GET /api/internal/money-auth-check`
+
+The route never returns the access token. On protected deployments it uses `x-internal-healthcheck-key` and fails closed when the key is required but absent.
+
+### Scenario validation probe
+
+`POST /api/internal/money-scenario-probe`
+
+This route is for staging contract discovery only:
+
+- available only when `VERCEL_ENV=preview`
+- requires `MONEY_API_BASE_URL=https://api-staging.money.com.au`
+- always requires `x-internal-healthcheck-key`
+- submits hard-coded synthetic data only
+- uses `staging-probe@example.invalid` and ACMA-reserved fictional mobile `0491570156`
+- sends no provider account ID
+- returns only `scenario_id` on success
+- on upstream `422`, returns only capped/redacted validation field/message evidence
+
+It is not a public lead endpoint and must never accept arbitrary customer payloads.
 
 ## Start verification
 
