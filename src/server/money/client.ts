@@ -1,6 +1,6 @@
 import "server-only";
 
-const DEFAULT_MONEY_API_BASE_URL = "https://api-staging.money.com.au";
+export const MONEY_STAGING_API_BASE_URL = "https://api-staging.money.com.au";
 const TOKEN_PATH = "/oauth/token";
 const HEALTH_INSURANCE_SCENARIO_PATH = "/v1/funnels/health-insurance";
 const REQUEST_TIMEOUT_MS = 12_000;
@@ -21,8 +21,10 @@ export type MoneyReferrer = {
 };
 
 /**
- * Fields confirmed from the supplied Money Admin API screenshot.
- * Enum values and business-required combinations are intentionally not guessed here.
+ * Fields confirmed from the supplied Money Admin API material plus a later
+ * staging/contact payload example. Where the two sources disagree on a type,
+ * the request type deliberately accepts only the observed variants until
+ * staging validation establishes the canonical contract.
  */
 export type MoneyHealthInsuranceScenarioRequest = {
   coverage_type: string;
@@ -30,12 +32,13 @@ export type MoneyHealthInsuranceScenarioRequest = {
     hospital: boolean;
     extras: boolean;
   };
-  reasons_for_cover?: string | null;
+  reasons_for_cover?: string | string[] | null;
   dob?: string | null;
   partner_dob?: string | null;
-  dependents?: string[] | null;
+  dependents?: unknown[] | null;
   state: MoneyState;
-  taxable_income?: number | null;
+  taxable_income?: number | string | null;
+  rebate_label?: string | null;
   hospital_service_classification?: string | null;
   current_provider_account_id?: string | null;
   hospital_services?: string[] | null;
@@ -57,6 +60,11 @@ export type MoneyHealthInsuranceScenarioResponse = {
   }>;
 };
 
+export type MoneyValidationIssue = {
+  field?: string;
+  message: string;
+};
+
 type MoneyOAuthTokenResponse = {
   access_token?: unknown;
   token_type?: unknown;
@@ -76,16 +84,21 @@ export class MoneyApiError extends Error {
     public readonly code: string,
     message: string,
     public readonly status?: number,
+    public readonly validationIssues?: MoneyValidationIssue[],
   ) {
     super(message);
     this.name = "MoneyApiError";
   }
 }
 
+export function getMoneyApiBaseUrl() {
+  return (process.env.MONEY_API_BASE_URL?.trim() || MONEY_STAGING_API_BASE_URL).replace(/\/+$/, "");
+}
+
 function getConfig() {
   const clientId = process.env.ClientID?.trim();
   const clientSecret = process.env.ClientSecret?.trim();
-  const baseUrl = (process.env.MONEY_API_BASE_URL?.trim() || DEFAULT_MONEY_API_BASE_URL).replace(/\/+$/, "");
+  const baseUrl = getMoneyApiBaseUrl();
 
   if (!clientId || !clientSecret) {
     throw new MoneyApiError(
@@ -117,6 +130,100 @@ async function fetchJson(url: string, init: RequestInit) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function sanitizeValidationText(value: string) {
+  return value
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[redacted-email]")
+    .replace(/\b(?:\+?61|0)4\d{8}\b/g, "[redacted-phone]")
+    .replace(/\b\d{4}-\d{2}-\d{2}\b/g, "[redacted-date]")
+    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi, "[redacted-id]")
+    .trim()
+    .slice(0, 240);
+}
+
+function inferredValidationField(path: string[]) {
+  const ignored = new Set([
+    "error",
+    "errors",
+    "message",
+    "messages",
+    "detail",
+    "details",
+    "validation",
+    "violations",
+    "issue",
+    "issues",
+  ]);
+
+  return [...path]
+    .reverse()
+    .find((part) => !ignored.has(part.toLowerCase()) && !/^\d+$/.test(part));
+}
+
+function collectValidationIssues(
+  value: unknown,
+  path: string[],
+  issues: MoneyValidationIssue[],
+) {
+  if (issues.length >= 20 || value == null) return;
+
+  if (typeof value === "string") {
+    const message = sanitizeValidationText(value);
+    if (!message) return;
+    const field = inferredValidationField(path);
+    issues.push(field ? { field, message } : { message });
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectValidationIssues(item, path, issues);
+      if (issues.length >= 20) break;
+    }
+    return;
+  }
+
+  if (typeof value !== "object") return;
+
+  const record = value as Record<string, unknown>;
+  const explicitField = ["field", "path", "property", "parameter"]
+    .map((key) => record[key])
+    .find((candidate) => typeof candidate === "string");
+  const explicitMessage = ["message", "detail", "error", "reason"]
+    .map((key) => record[key])
+    .find((candidate) => typeof candidate === "string");
+
+  if (typeof explicitMessage === "string") {
+    const message = sanitizeValidationText(explicitMessage);
+    if (message) {
+      const field = typeof explicitField === "string"
+        ? sanitizeValidationText(explicitField).slice(0, 100)
+        : inferredValidationField(path);
+      issues.push(field ? { field, message } : { message });
+    }
+  }
+
+  for (const [key, child] of Object.entries(record)) {
+    if (["message", "detail", "error", "reason", "field", "path", "property", "parameter"].includes(key)) {
+      continue;
+    }
+    collectValidationIssues(child, [...path, key], issues);
+    if (issues.length >= 20) break;
+  }
+}
+
+function extractValidationIssues(payload: unknown) {
+  const issues: MoneyValidationIssue[] = [];
+  collectValidationIssues(payload, [], issues);
+
+  const seen = new Set<string>();
+  return issues.filter((issue) => {
+    const key = `${issue.field || ""}\n${issue.message}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export async function getMoneyAccessToken(): Promise<{ accessToken: string; tokenType: string }> {
@@ -194,6 +301,7 @@ export async function createMoneyHealthInsuranceScenario(
       response.status === 422 ? "LEAD_REJECTED" : "UPSTREAM_REQUEST_FAILED",
       `Money health-insurance scenario request failed with HTTP ${response.status}.`,
       response.status,
+      response.status === 422 ? extractValidationIssues(payload) : undefined,
     );
   }
 
