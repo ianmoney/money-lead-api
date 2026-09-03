@@ -6,16 +6,21 @@ Unresolved items fail closed; they are not inferred from examples.
 | --- | --- | --- | --- |
 | OD-01 | Complete production `coverage_type` enum | Admin screenshot confirms field and one example only | Money API owner supplies full enum/mapping |
 | OD-02 | Provider account IDs and whether required | Field is `current_provider_account_id`; no mapping supplied | Money API owner supplies approved list |
-| OD-03 | OAuth credential encoding | Not visible in supplied Admin screenshot | Existing `money-lead-api` docs/code review |
 | OD-04 | Upstream phone representation | Public verification contract uses E.164; upstream requirement unconfirmed | Money API owner confirms |
 | OD-05 | Upstream idempotency header | Not supplied | Money API owner confirms; internal idempotency still required |
 | OD-06 | Required scenario/request fields | Screenshot confirms shape, not all business requirements | Staging validation with API owner |
 | OD-07 | Gender, citizenship and dependants | No confirmed downstream requirement | Product/compliance/API owners decide |
 | OD-10 | Durable expiring store/vendor/region | Requirement supplied, provider not selected | Security/platform approval |
-| OD-11 | Security-critical server implementation and tests | Repository now contains the frontend widget only | Implement and independently review the backend before staging UAT |
+| OD-11 | Security-critical verification/idempotency backend and tests | Money staging OAuth client is now implemented; OTP proof, durable state and public lead endpoint are not | Implement and independently review before staging UAT |
 | OD-12 | Turnstile/Twilio/staging credentials | Not supplied | Human-approved staging UAT gate |
 
-Confirmed by supplied material: Money brand colours (`#3F00DE`, `#85E8FF`, black and UX greys), Messina Sans family guidance, Money upstream base/endpoint, state abbreviations, core request field names and response `scenario_id` location.
+Confirmed by supplied material: Money brand colours (`#3F00DE`, `#85E8FF`, black and UX greys), Messina Sans family guidance, Money upstream health-insurance endpoint, state abbreviations, core request field names and response `scenario_id` location.
+
+## Resolved integration decisions
+
+- 2026-09-03: staging base URL is `https://api-staging.money.com.au`.
+- 2026-09-03: authentication is `POST /oauth/token` with a JSON client-credentials body containing `grant_type: client_credentials`, `client_id`, `client_secret`, and `scope: ""`.
+- 2026-09-03: Vercel server-only environment variable names are `ClientID` and `ClientSecret`. These must never be exposed as `NEXT_PUBLIC_*` variables.
 
 ## Resolved product decisions
 
