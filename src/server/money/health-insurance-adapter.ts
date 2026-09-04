@@ -5,6 +5,7 @@ import {
   coverForOptions,
   coverTypeOptions,
   providerOptions,
+  genderOptions,
   stateOptions,
   type LeadAnswers,
 } from "@/features/health-quote/schema";
@@ -18,14 +19,10 @@ import {
 type CoverFor = (typeof coverForOptions)[number];
 type CoverType = (typeof coverTypeOptions)[number];
 type Provider = (typeof providerOptions)[number];
+type Gender = (typeof genderOptions)[number];
 
 export type MoneyHealthInsuranceMapping = {
-  /**
-   * Values must come from Money API-owner or staging evidence. Individual
-   * examples are gender-specific, while the public form does not currently
-   * collect gender, so this mapping intentionally has no defaults.
-   */
-  coverageTypeByCoverFor: Partial<Record<CoverFor, string>>;
+  coverageTypeByCoverFor?: Partial<Record<CoverFor, string>>;
   providerAccountIdByFund?: Partial<Record<Provider, string>>;
   contactPhoneFormat?: "E164" | "AU_LOCAL";
 };
@@ -93,11 +90,15 @@ function moneyProviderAccountId(
   if (provider === "No current fund" || provider === "Other") return null;
 
   const accountId = mapping.providerAccountIdByFund?.[provider]?.trim();
-  if (!accountId) {
-    return mappingRequired(`Money provider account ID is not configured for ${provider}.`);
-  }
+  return accountId || null;
+}
 
-  return accountId;
+function moneyCoverageType(coverFor: CoverFor, gender: Gender, mapping: MoneyHealthInsuranceMapping) {
+  const configured = mapping.coverageTypeByCoverFor?.[coverFor]?.trim();
+  if (configured) return configured;
+  if (coverFor === "Individual") return gender === "Female" ? "JUST_YOU_FEMALE" : "JUST_YOU_MALE";
+  if (coverFor === "Couple") return "COUPLE";
+  return "FAMILY";
 }
 
 function moneyReferrer(attribution: Attribution, campaign?: string | null) {
@@ -139,14 +140,14 @@ export function buildMoneyHealthInsuranceScenario(
   if (!isOneOf(providerOptions, answers.current_health_fund)) {
     throw new MoneyApiError("INVALID_REQUEST", "Current health fund is not supported.");
   }
+  if (!isOneOf(genderOptions, answers.gender)) {
+    throw new MoneyApiError("INVALID_REQUEST", "Gender selection is not supported.");
+  }
   if (!isOneOf(stateOptions, answers.state)) {
     throw new MoneyApiError("INVALID_REQUEST", "State or territory is not supported.");
   }
 
-  const coverageType = mapping.coverageTypeByCoverFor[answers.cover_for]?.trim();
-  if (!coverageType) {
-    return mappingRequired(`Money coverage type is not configured for ${answers.cover_for}.`);
-  }
+  const coverageType = moneyCoverageType(answers.cover_for, answers.gender, mapping);
 
   return {
     coverage_type: coverageType,

@@ -55,6 +55,8 @@ export type MoneyHealthInsuranceScenarioRequest = {
 export type MoneyHealthInsuranceScenarioResponse = {
   acceptance_id: string;
   acceptance_id_field: "scenario_id" | "funnel_request_id";
+  upstream_status: number;
+  raw_response: unknown;
   matchmaker_results?: Array<{
     scenario_matchmaker_result_id: string;
     package: unknown[] | null;
@@ -103,6 +105,7 @@ export class MoneyApiError extends Error {
     public readonly status?: number,
     public readonly validationIssues?: MoneyValidationIssue[],
     public readonly responseShape?: MoneyResponseShape,
+    public readonly rawResponse?: unknown,
   ) {
     super(message);
     this.name = "MoneyApiError";
@@ -358,6 +361,8 @@ export async function createMoneyHealthInsuranceScenario(
       `Money health-insurance scenario request failed with HTTP ${response.status}.`,
       response.status,
       response.status === 422 ? extractValidationIssues(payload) : undefined,
+      undefined,
+      payload,
     );
   }
 
@@ -366,6 +371,8 @@ export async function createMoneyHealthInsuranceScenario(
     return {
       acceptance_id: result.scenario_id,
       acceptance_id_field: "scenario_id",
+      upstream_status: response.status,
+      raw_response: payload,
       matchmaker_results: result.matchmaker_results as NonNullable<MoneyHealthInsuranceScenarioResponse["matchmaker_results"]>,
     };
   }
@@ -377,6 +384,8 @@ export async function createMoneyHealthInsuranceScenario(
     return {
       acceptance_id: result.funnel_request_id,
       acceptance_id_field: "funnel_request_id",
+      upstream_status: response.status,
+      raw_response: payload,
     };
   }
 
@@ -386,5 +395,6 @@ export async function createMoneyHealthInsuranceScenario(
     response.status,
     undefined,
     describeResponseShape(payload),
+    payload,
   );
 }

@@ -56,7 +56,15 @@ This route is for staging contract discovery only:
 
 It is not a public lead endpoint and must never accept arbitrary customer payloads.
 
-## Start verification
+## Current direct lead submission
+
+Phone OTP is intentionally deferred. The browser posts directly to the same-origin lead route. Before Money is called, the server reserves an idempotent row in the private Google Sheet backup. The same row is then updated with the Money HTTP status, acceptance identifier, complete upstream response, or failure details. A lead is not sent to Money when the initial backup reservation fails.
+
+The public response never includes the raw Money response. It is written only to the private backup Sheet. A repeated accepted `submission_id` returns the stored acceptance ID without creating another Money lead; a repeated pending ID returns `SUBMISSION_IN_PROGRESS`.
+
+The form collects gender because Money's confirmed individual enum is gender-specific. The adapter uses `JUST_YOU_MALE`, `JUST_YOU_FEMALE`, `COUPLE`, and `FAMILY`; Couple and Family remain staging-verification items before production promotion. Current provider names are preserved in the Sheet and `current_provider_account_id` is left `null` until Money provides the provider UUID mapping.
+
+## Deferred phone verification
 
 `POST /api/v1/phone-verification/start`
 
@@ -92,7 +100,7 @@ Success, `200`:
 
 The proof is bound to the normalized phone, funnel and verification session. Only its hash is stored. Codes, phones, tokens and provider bodies are never logged.
 
-## Submit verified lead
+## Submit lead
 
 `POST /api/v1/health-insurance/leads`
 
@@ -101,9 +109,9 @@ Request, maximum 32 KB:
 ```json
 {
   "submission_id":"client-generated-uuid",
-  "verification_token":"opaque-one-time-token",
   "lead":{
     "cover_for":"Individual",
+    "gender":"Female",
     "cover_type":"Hospital & Extras",
     "state":"VIC",
     "dob":"1980-01-01",
@@ -124,7 +132,7 @@ Success, `200` or idempotent replay `200`:
 {"success":true,"submission_id":"client-generated-uuid","redirect_url":"server-allowlisted-url"}
 ```
 
-The backend strictly validates all enums and lengths, atomically consumes the proof, checks exact normalized-phone and funnel binding, and makes `submission_id` concurrency-safe. It returns no OAuth token, Twilio data, upstream body or scenario details.
+The backend strictly validates all enums and lengths and uses the Sheet reservation to make `submission_id` replay-safe. It returns no OAuth token, Google webhook secret, upstream body, or matchmaker details.
 
 The public UI collects only `birth_year`. Per the product-owner decision on 2 September 2026, the first-party adapter constructs `dob` as `YYYY-01-01` (1 January of the selected year). No month or day is requested from the user.
 
