@@ -52,7 +52,7 @@ function parseRequest(value: unknown): LeadRequest | null {
   if (!requiredString(value.submission_id, 80) ||
       !isAllowed(providerOptions, lead.current_health_fund) ||
       !isAllowed(coverForOptions, lead.cover_for) ||
-      !(lead.gender === "" || isAllowed(genderOptions, lead.gender)) ||
+      !(isAllowed(genderOptions, lead.gender) || (lead.gender === "" && lead.cover_for !== "Individual")) ||
       !isAllowed(coverTypeOptions, lead.cover_type) ||
       !isAllowed(stateOptions, lead.state) ||
       !requiredString(lead.birth_year, 4) || !/^\d{4}$/.test(lead.birth_year as string) ||

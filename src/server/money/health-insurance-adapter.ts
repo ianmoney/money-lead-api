@@ -101,7 +101,7 @@ function moneyCoverageType(coverFor: CoverFor, gender: Gender | "", mapping: Mon
   if (coverFor === "Individual") {
     if (gender === "Female") return "JUST_YOU_FEMALE";
     if (gender === "Male") return "JUST_YOU_MALE";
-    return "JUST_YOU";
+    return mappingRequired("Money requires gender for individual health cover.");
   }
   if (coverFor === "Couple") return "COUPLE";
   return "FAMILY";
