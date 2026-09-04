@@ -2,6 +2,8 @@
 
 A reusable, mobile-first Money.com.au health-insurance quote flow built with Next.js.
 
+The server reserves and updates an idempotent Google Sheet backup row around each Money API request, including the full upstream response for operational recovery.
+
 ## Routes
 
 - `/health-insurance/quote` — stripped-down iframe widget
@@ -14,11 +16,8 @@ npm install
 npm run dev
 ```
 
-Development uses a deterministic local mock. It never calls Twilio, Money or another external API.
+Development uses a deterministic local mock. It never calls Money or another external API.
 
-- Success code: `246810`
-- Expired-code state: `000000`
-- Rate-limited state: `999999`
 - Submission failure: use `fail@example.invalid`
 
 ## Interaction decisions
@@ -27,7 +26,7 @@ Choice cards advance to the next question on click. Birth year uses a clickable 
 
 ## Production configuration
 
-Copy `.env.example` to the deployment environment and supply only approved values. Production fails closed if the API origin, Turnstile or consent version is missing. The privacy/terms links and Money.com.au thank-you URL are fixed in source. The browser talks only to the first-party API contract in `docs/API_CONTRACTS.md`; OAuth and Twilio secrets belong in server-only configuration and must never be exposed as `NEXT_PUBLIC_*` values.
+Copy `.env.example` to the deployment environment and supply only approved values. The required server-only values are `ClientID`, `ClientSecret`, `MONEY_API_BASE_URL`, `GOOGLE_SHEETS_WEBHOOK_URL`, and `GOOGLE_SHEETS_WEBHOOK_SECRET`. The Apps Script source is in `integrations/google-apps-script/Code.gs`; its `WEBHOOK_SECRET` Script Property must match Vercel. The privacy/terms links and Money.com.au thank-you URL are fixed in source.
 
 ## Verification
 

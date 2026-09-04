@@ -21,7 +21,7 @@ PII, OTP state, verification proofs, Money/Twilio/Turnstile credentials, OAuth t
 
 ## PII retention
 
-The browser retains answers in React memory only. The temporary store retains phone hashes, session metadata, attempt/rate counters, proof hashes and idempotency status only for documented TTLs. It does not retain the full lead. The Money API remains the system of record after acceptance. Durable-store vendor, region, encryption and deletion policy are an open approval item.
+The browser retains answers in React memory only. The temporary store retains phone hashes, session metadata, attempt/rate counters, proof hashes and idempotency status only for documented TTLs. It does not retain the full lead. The Money API remains the system of record after acceptance. Failed submissions are not currently retained or downloadable. Adding recovery requires a separately approved encrypted failure queue with strict access, retention, deletion and audit controls; full lead payloads must not be added to the verification/idempotency store by accident. Durable-store vendor, region, encryption and deletion policy are an open approval item.
 
 ## Security headers
 

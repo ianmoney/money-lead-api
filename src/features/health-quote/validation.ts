@@ -10,6 +10,7 @@ export function normalizeAustralianMobile(value: string) {
 export function validateStep(step: StepId, answers: LeadAnswers): string | null {
   if (step === "current_health_fund" && !answers.current_health_fund) return "Choose your current health fund to continue.";
   if (step === "cover_for" && !answers.cover_for) return "Choose who needs health cover.";
+  if (step === "gender" && !answers.gender) return "Choose your gender.";
   if (step === "cover_type" && !answers.cover_type) return "Choose the type of cover you want.";
   if (step === "state" && !answers.state) return "Choose your state or territory.";
   if (step === "birth_year" && (!/^\d{4}$/.test(answers.birth_year) || Number(answers.birth_year) < 1900 || Number(answers.birth_year) > new Date().getFullYear())) return "Choose your birth year.";

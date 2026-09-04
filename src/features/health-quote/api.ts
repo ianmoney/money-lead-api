@@ -7,11 +7,10 @@ export class QuoteApiError extends Error {
 }
 
 const mockMode = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
-const apiBase = process.env.NEXT_PUBLIC_LEAD_API_BASE_URL?.replace(/\/$/, "");
+const apiBase = process.env.NEXT_PUBLIC_LEAD_API_BASE_URL?.replace(/\/$/, "") || "";
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function post<T>(path: string, body: unknown): Promise<T> {
-  if (!apiBase) throw new QuoteApiError("CONFIGURATION_REQUIRED", "Online verification is not configured yet. Please try again later.");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12_000);
   try {
@@ -44,7 +43,7 @@ export async function checkVerification(verificationId: string, code: string) {
   return post<{ verified: true; verification_token: string; expires_in: number }>("/api/v1/phone-verification/check", { verification_id: verificationId, code });
 }
 
-export async function submitLead(args: { submissionId: string; verificationToken: string; answers: LeadAnswers; attribution: Attribution; consentVersion: string; }) {
+export async function submitLead(args: { submissionId: string; answers: LeadAnswers; attribution: Attribution; consentVersion: string; }) {
   const phone = normalizeAustralianMobile(args.answers.phone);
   if (!phone) throw new QuoteApiError("INVALID_PHONE", "The verified mobile number is no longer valid.");
   if (mockMode) {
@@ -52,15 +51,15 @@ export async function submitLead(args: { submissionId: string; verificationToken
     if (args.answers.email.toLowerCase() === "fail@example.invalid") throw new QuoteApiError("UPSTREAM_UNAVAILABLE", "Money could not accept the quote just now. Your details have not been submitted. Please try again.");
     return { success: true as const, submission_id: args.submissionId, redirect_url: null };
   }
-  return post<{ success: true; submission_id: string; redirect_url: string }>("/api/v1/health-insurance/leads", {
+  return post<{ success: true; submission_id: string; acceptance_id: string; acceptance_id_field: string; backup_status: "saved" | "pending"; redirect_url: string }>("/api/v1/health-insurance/leads", {
     submission_id: args.submissionId,
-    verification_token: args.verificationToken,
     lead: {
       current_health_fund: args.answers.current_health_fund,
       cover_for: args.answers.cover_for,
+      gender: args.answers.gender,
       cover_type: args.answers.cover_type,
       state: args.answers.state,
-      dob: `${args.answers.birth_year}-01-01`,
+      birth_year: args.answers.birth_year,
       first_name: args.answers.first_name,
       last_name: args.answers.last_name,
       email: args.answers.email,
