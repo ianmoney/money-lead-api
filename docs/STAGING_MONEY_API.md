@@ -136,7 +136,7 @@ POST /api/internal/money-scenario-probe
 x-internal-healthcheck-key: <INTERNAL_HEALTHCHECK_KEY>
 ```
 
-The probe intentionally uses a synthetic payload and no provider UUID. A `422` is useful evidence: record only the redacted field/message output and use it to refine the typed contract. A success response returns the generated `scenario_id`; verify that ID in Money Admin staging before treating the scenario creation path as confirmed.
+The probe intentionally uses a synthetic payload and no provider UUID. A `422` is useful evidence: record only the redacted field/message output and use it to refine the typed contract. A success response returns the generated `scenario_id`; verify that ID in Money Admin staging before treating the scenario creation path as confirmed. If Money returns HTTP 200 with an unknown schema, the probe returns a bounded `response_shape` summary with field names, value types and array lengths only; it never returns response values.
 
 ## What is intentionally not wired to the public form yet
 

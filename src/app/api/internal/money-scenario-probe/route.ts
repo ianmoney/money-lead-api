@@ -89,6 +89,18 @@ export async function POST(request: Request) {
       );
     }
 
+    if (apiError.code === "UPSTREAM_RESPONSE_INVALID") {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: apiError.code,
+          message: apiError.message,
+          response_shape: apiError.responseShape,
+        },
+        { status: 503 },
+      );
+    }
+
     return NextResponse.json(
       { ok: false, code: apiError.code, message: apiError.message },
       { status: apiError.status === 401 || apiError.status === 403 ? 502 : 503 },

@@ -65,6 +65,13 @@ export type MoneyValidationIssue = {
   message: string;
 };
 
+export type MoneyResponseShape =
+  | { type: "null" }
+  | { type: "boolean" | "number" | "string" }
+  | { type: "array"; length: number; items: MoneyResponseShape[] }
+  | { type: "object"; fields: Record<string, MoneyResponseShape> }
+  | { type: "truncated" };
+
 type MoneyOAuthTokenResponse = {
   access_token?: unknown;
   token_type?: unknown;
@@ -85,10 +92,49 @@ export class MoneyApiError extends Error {
     message: string,
     public readonly status?: number,
     public readonly validationIssues?: MoneyValidationIssue[],
+    public readonly responseShape?: MoneyResponseShape,
   ) {
     super(message);
     this.name = "MoneyApiError";
   }
+}
+
+function safeResponseFieldName(value: string) {
+  return /^[A-Za-z_][A-Za-z0-9_-]{0,63}$/.test(value) ? value : "[redacted-key]";
+}
+
+function describeResponseShape(
+  value: unknown,
+  depth = 0,
+  budget = { remaining: 80 },
+): MoneyResponseShape {
+  if (budget.remaining <= 0 || depth >= 6) return { type: "truncated" };
+  budget.remaining -= 1;
+
+  if (value === null) return { type: "null" };
+  if (typeof value === "string") return { type: "string" };
+  if (typeof value === "number") return { type: "number" };
+  if (typeof value === "boolean") return { type: "boolean" };
+
+  if (Array.isArray(value)) {
+    return {
+      type: "array",
+      length: value.length,
+      items: value.slice(0, 3).map((item) => describeResponseShape(item, depth + 1, budget)),
+    };
+  }
+
+  if (typeof value === "object") {
+    const fields: Record<string, MoneyResponseShape> = {};
+    for (const [key, child] of Object.entries(value as Record<string, unknown>).slice(0, 40)) {
+      const safeKey = safeResponseFieldName(key);
+      fields[safeKey] = describeResponseShape(child, depth + 1, budget);
+      if (budget.remaining <= 0) break;
+    }
+    return { type: "object", fields };
+  }
+
+  return { type: "truncated" };
 }
 
 export function getMoneyApiBaseUrl() {
@@ -310,6 +356,9 @@ export async function createMoneyHealthInsuranceScenario(
     throw new MoneyApiError(
       "UPSTREAM_RESPONSE_INVALID",
       "Money health-insurance scenario response did not match the expected shape.",
+      response.status,
+      undefined,
+      describeResponseShape(payload),
     );
   }
 

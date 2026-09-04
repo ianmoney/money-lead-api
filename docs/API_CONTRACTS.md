@@ -40,6 +40,7 @@ This route is for staging contract discovery only:
 - sends no provider account ID
 - returns only `scenario_id` on success
 - on upstream `422`, returns only capped/redacted validation field/message evidence
+- on a successful upstream response with an unknown schema, returns a bounded structural summary containing field names, value types and array lengths but never field values
 
 It is not a public lead endpoint and must never accept arbitrary customer payloads.
 
