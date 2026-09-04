@@ -70,7 +70,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       upstream: "money-staging",
-      scenario_id: result.scenario_id,
+      acceptance_id: result.acceptance_id,
+      acceptance_id_field: result.acceptance_id_field,
     });
   } catch (error) {
     const apiError = error instanceof MoneyApiError

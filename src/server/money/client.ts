@@ -53,11 +53,21 @@ export type MoneyHealthInsuranceScenarioRequest = {
 };
 
 export type MoneyHealthInsuranceScenarioResponse = {
-  scenario_id: string;
-  matchmaker_results: Array<{
+  acceptance_id: string;
+  acceptance_id_field: "scenario_id" | "funnel_request_id";
+  matchmaker_results?: Array<{
     scenario_matchmaker_result_id: string;
     package: unknown[] | null;
   }>;
+};
+
+type MoneyDocumentedScenarioResponse = {
+  scenario_id?: unknown;
+  matchmaker_results?: unknown;
+};
+
+type MoneyObservedFunnelResponse = {
+  funnel_request_id?: unknown;
 };
 
 export type MoneyValidationIssue = {
@@ -351,16 +361,30 @@ export async function createMoneyHealthInsuranceScenario(
     );
   }
 
-  const result = (payload || {}) as Partial<MoneyHealthInsuranceScenarioResponse>;
-  if (typeof result.scenario_id !== "string" || !Array.isArray(result.matchmaker_results)) {
-    throw new MoneyApiError(
-      "UPSTREAM_RESPONSE_INVALID",
-      "Money health-insurance scenario response did not match the expected shape.",
-      response.status,
-      undefined,
-      describeResponseShape(payload),
-    );
+  const result = (payload || {}) as MoneyDocumentedScenarioResponse & MoneyObservedFunnelResponse;
+  if (typeof result.scenario_id === "string" && Array.isArray(result.matchmaker_results)) {
+    return {
+      acceptance_id: result.scenario_id,
+      acceptance_id_field: "scenario_id",
+      matchmaker_results: result.matchmaker_results as NonNullable<MoneyHealthInsuranceScenarioResponse["matchmaker_results"]>,
+    };
   }
 
-  return result as MoneyHealthInsuranceScenarioResponse;
+  // Observed from the protected staging probe on 4 September 2026. The
+  // upstream response also contained contact fields; intentionally discard
+  // them and retain only the opaque acceptance identifier.
+  if (typeof result.funnel_request_id === "string" && result.funnel_request_id.trim()) {
+    return {
+      acceptance_id: result.funnel_request_id,
+      acceptance_id_field: "funnel_request_id",
+    };
+  }
+
+  throw new MoneyApiError(
+    "UPSTREAM_RESPONSE_INVALID",
+    "Money health-insurance scenario response did not match an accepted shape.",
+    response.status,
+    undefined,
+    describeResponseShape(payload),
+  );
 }

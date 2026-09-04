@@ -16,7 +16,6 @@ Unresolved items fail closed; they are not inferred from examples.
 | OD-10 | Durable expiring store/vendor/region | Requirement supplied, provider not selected | Security/platform approval |
 | OD-11 | Security-critical verification/idempotency backend and tests | Money staging OAuth client is implemented; OTP proof, durable state and public lead endpoint are not | Implement and independently review before staging UAT |
 | OD-12 | Turnstile/Twilio/staging credentials | Not supplied | Human-approved staging UAT gate |
-| OD-13 | Successful scenario creation as final lead-acceptance event | Response contains `scenario_id`, but downstream acceptance semantics are not confirmed | Money API owner confirms whether scenario creation is the final accepted-lead event |
 
 Confirmed by supplied material: Money brand colours (`#3F00DE`, `#85E8FF`, black and UX greys), Messina Sans family guidance, Money upstream health-insurance endpoint, state abbreviations, core request field names and response `scenario_id` location.
 
@@ -35,3 +34,6 @@ Confirmed by supplied material: Money brand colours (`#3F00DE`, `#85E8FF`, black
 - 2026-09-02: choice cards and birth-year cards advance on click. No Continue button; retain a small Back control.
 - 2026-09-02: consent text is “I agree to the Privacy Policy and Terms of Use,” linked to the supplied Money.com.au pages; the consent version remains deployment configuration.
 - 2026-09-02: after successful production submission, redirect the whole embedding page to `https://www.money.com.au/health-insurance/health-thank-you`.
+- 2026-09-04: a successful Money response containing `scenario_id` is the final accepted-lead event.
+- 2026-09-04: unanswered optional Money fields are sent using the contract's empty representation (`null` for nullable scalar fields and `[]` for list fields). Values are not invented.
+- 2026-09-04: answers that cannot yet be mapped require a confirmed Money field name and type. The currently known contract contains no `description` field, so unmapped answers must not be placed in an undocumented field.

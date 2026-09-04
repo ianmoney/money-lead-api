@@ -16,7 +16,17 @@ The supplied Money Admin material and later staging/contact payload confirm:
 - `taxable_income` has been observed as both number-like documentation and a string payload, so the staging client accepts number or string pending canonical-contract confirmation
 - response contains `scenario_id` and `matchmaker_results`
 
-The complete `coverage_type` enum, Couple/Family requirements, provider UUID mapping, canonical `reasons_for_cover` type, continuous-cover rule and final lead-acceptance semantics are not yet established. Production mappings remain configuration-backed and fail closed.
+The protected staging probe on 4 September 2026 observed a second successful response shape containing `funnel_request_id`, `email`, `first_name` and `surname`. The server accepts `funnel_request_id` as an alternative opaque acceptance ID and discards the returned contact fields. Public and internal responses expose only `acceptance_id` and `acceptance_id_field`.
+
+The complete `coverage_type` enum, Couple/Family requirements, provider UUID mapping, canonical `reasons_for_cover` type and continuous-cover rule are not yet established. Production mappings remain configuration-backed and fail closed. A successful response containing `scenario_id` is treated as the final accepted-lead event per the product-owner decision on 4 September 2026.
+
+Unanswered optional fields use the documented empty shape: `null` for nullable scalar fields and `[]` for list fields. Known form answers are mapped only to confirmed Money fields. The known contract does not include a `description` field, so answers without a confirmed field name and type are not packed into an undocumented fallback field.
+
+## Jack Media-style flat payload evidence
+
+The supplied Jack Media screenshot and public quiz code establish a separate flat lead shape. `src/server/money/flat-health-lead-adapter.ts` builds that shape without treating it as the confirmed Money scenario request. Directly compatible answers map to `First_Name`, `Last_Name`, `Email`, `Mobile`, `State`, `Date_of_Birth` and `External_Id_Reference`. Current fund, requested cover type and who needs cover are preserved in `Description`. Unanswered scalar fields are empty strings and unanswered service/rebate fields are `null`, matching the supplied example.
+
+The public Jack Media quiz first posts its own camel-case questionnaire payload to a Jack Media lead-distribution endpoint. The capitalised/underscored record in the screenshot is therefore treated as downstream mapping evidence, not proof that `POST /v1/funnels/health-insurance` accepts those keys. The flat payload must remain disconnected until the receiving endpoint and its exact case-sensitive contract are confirmed.
 
 ## Internal staging diagnostics
 
@@ -38,7 +48,7 @@ This route is for staging contract discovery only:
 - submits hard-coded synthetic data only
 - uses `staging-probe@example.invalid` and ACMA-reserved fictional mobile `0491570156`
 - sends no provider account ID
-- returns only `scenario_id` on success
+- returns only `acceptance_id` and `acceptance_id_field` on success
 - on upstream `422`, returns only capped/redacted validation field/message evidence
 - on a successful upstream response with an unknown schema, returns a bounded structural summary containing field names, value types and array lengths but never field values
 

@@ -81,7 +81,7 @@ The supplied provider UUID is not mapped to a health fund because the evidence d
 - uses `staging-probe@example.invalid` and ACMA-reserved fictional mobile `0491 570 156`
 - sends empty arrays where the supplied payload showed arrays
 - sends no provider account ID
-- returns only `scenario_id` on success
+- returns only the opaque `acceptance_id` and its source field name on success
 - returns a capped, redacted validation issue list for `422` responses and never returns the upstream request body or OAuth token
 
 ## Vercel variables
@@ -136,7 +136,7 @@ POST /api/internal/money-scenario-probe
 x-internal-healthcheck-key: <INTERNAL_HEALTHCHECK_KEY>
 ```
 
-The probe intentionally uses a synthetic payload and no provider UUID. A `422` is useful evidence: record only the redacted field/message output and use it to refine the typed contract. A success response returns the generated `scenario_id`; verify that ID in Money Admin staging before treating the scenario creation path as confirmed. If Money returns HTTP 200 with an unknown schema, the probe returns a bounded `response_shape` summary with field names, value types and array lengths only; it never returns response values.
+The probe intentionally uses a synthetic payload and no provider UUID. A `422` is useful evidence: record only the redacted field/message output and use it to refine the typed contract. A success response returns the generated opaque acceptance ID; verify that ID in Money Admin staging before treating the scenario creation path as confirmed. The 4 September 2026 probe observed `funnel_request_id` instead of the Admin screenshot's `scenario_id`; both are accepted and normalized. If Money returns HTTP 200 with an unknown schema, the probe returns a bounded `response_shape` summary with field names, value types and array lengths only; it never returns response values.
 
 ## What is intentionally not wired to the public form yet
 
@@ -150,7 +150,7 @@ Do not guess:
 - the canonical type and allowed values for `reasons_for_cover`
 - whether `bo_continuous_cover` should be inferred from having a current fund
 - any upstream idempotency header
-- whether successful scenario creation is the final lead-acceptance event
+- any undocumented catch-all or `description` field for answers without a confirmed field mapping
 
 The public flow also still needs the first-party OTP/verification proof, durable expiring state, idempotency, Turnstile verification and associated tests described in `ARCHITECTURE.md` and `docs/API_CONTRACTS.md`.
 
@@ -161,5 +161,5 @@ The public flow also still needs the first-party OTP/verification proof, durable
 3. Run the OAuth smoke test.
 4. Run the protected synthetic scenario probe.
 5. Use redacted staging validation evidence to resolve request mappings.
-6. Verify any successful `scenario_id` in Money Admin staging.
+6. Verify any successful `acceptance_id` in Money Admin staging. Once returned, it is treated as the accepted-lead event per the product-owner decision on 4 September 2026.
 7. Keep the public form disconnected until verification, durable state, idempotency and strict fail-closed validation are implemented and reviewed.
