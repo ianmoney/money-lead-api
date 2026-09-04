@@ -55,7 +55,9 @@ function mappingRequired(message: string): never {
 }
 
 function assertIsoDateOrNull(value: string | null | undefined, field: string) {
-  if (value == null) return null;
+  // Money's Laravel Data DTO models omitted partner_dob as Optional, but rejects
+  // an explicit JSON null before its validation rules run.
+  if (value == null) return undefined;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     throw new MoneyApiError("INVALID_REQUEST", `${field} must use YYYY-MM-DD format.`);
   }
