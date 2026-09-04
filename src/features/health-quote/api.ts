@@ -59,7 +59,7 @@ export async function submitLead(args: { submissionId: string; answers: LeadAnsw
       gender: args.answers.gender,
       cover_type: args.answers.cover_type,
       state: args.answers.state,
-      dob: `${args.answers.birth_year}-01-01`,
+      birth_year: args.answers.birth_year,
       first_name: args.answers.first_name,
       last_name: args.answers.last_name,
       email: args.answers.email,

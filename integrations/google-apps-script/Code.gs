@@ -68,3 +68,8 @@ function doPost(e) {
     try { lock.releaseLock(); } catch (ignore) {}
   }
 }
+
+function authorizeAccess() {
+  SpreadsheetApp.openById(SPREADSHEET_ID).getName();
+  PropertiesService.getScriptProperties().getProperty("WEBHOOK_SECRET");
+}
