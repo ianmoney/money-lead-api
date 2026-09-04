@@ -28,6 +28,8 @@ The supplied Jack Media screenshot and public quiz code establish a separate fla
 
 The public Jack Media quiz first posts its own camel-case questionnaire payload to a Jack Media lead-distribution endpoint. The capitalised/underscored record in the screenshot is therefore treated as downstream mapping evidence, not proof that `POST /v1/funnels/health-insurance` accepts those keys. The flat payload must remain disconnected until the receiving endpoint and its exact case-sensitive contract are confirmed.
 
+A protected synthetic staging test on 4 September 2026 confirmed that sending the flat payload directly to `POST /v1/funnels/health-insurance` returns HTTP `412 Precondition Failed`. The existing lower-case scenario contract remains the only confirmed request shape for that endpoint.
+
 ## Internal staging diagnostics
 
 ### OAuth health check
