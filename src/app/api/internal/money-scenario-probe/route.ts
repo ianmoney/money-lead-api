@@ -4,43 +4,38 @@ import {
   getMoneyApiBaseUrl,
   MoneyApiError,
   MONEY_STAGING_API_BASE_URL,
-  type MoneyHealthInsuranceScenarioRequest,
 } from "@/server/money/client";
+import { buildFlatHealthLeadPayload } from "@/server/money/flat-health-lead-adapter";
+import type { Attribution } from "@/features/health-quote/analytics";
+import type { LeadAnswers } from "@/features/health-quote/schema";
 
 export const dynamic = "force-dynamic";
 
-const SYNTHETIC_STAGING_SCENARIO: MoneyHealthInsuranceScenarioRequest = {
-  coverage_type: "JUST_YOU_MALE",
-  dob: "1990-01-01",
+const SYNTHETIC_ANSWERS: LeadAnswers = {
+  current_health_fund: "Bupa",
+  cover_for: "Individual",
+  cover_type: "Hospital Only",
   state: "QLD",
-  taxable_income: "130000",
-  rebate_label: "$118,001 - $158,000",
-  hospital_services: [],
-  extra_services: [],
-  cover_type: {
-    hospital: true,
-    extras: false,
-  },
-  contact_first_name: "Staging",
-  contact_last_name: "Probe",
-  contact_email: "staging-probe@example.invalid",
+  birth_year: "1990",
+  first_name: "Staging",
+  last_name: "Probe",
+  email: "staging-probe@example.invalid",
   // ACMA-reserved fictional mobile number. Never replace with customer data.
-  contact_phone: "0491570156",
-  referrer: {
-    ga_client_id: null,
-    gclid: null,
-    fbclid: null,
-    utm_source: "staging-probe",
-    utm_medium: "internal",
-    utm_campaign: null,
-    utm_content: null,
-    utm_term: null,
-    http_referrer: "/api/internal/money-scenario-probe",
-  },
-  reasons_for_cover: [],
-  dependents: [],
-  bo_continuous_cover: true,
-  current_provider_account_id: null,
+  phone: "0491570156",
+  consentAccepted: true,
+};
+
+const SYNTHETIC_ATTRIBUTION: Attribution = {
+  utm_source: "staging-probe",
+  utm_medium: "internal",
+  utm_campaign: null,
+  utm_content: null,
+  utm_term: null,
+  fbclid: null,
+  gclid: null,
+  landing_url: "/api/internal/money-scenario-probe",
+  referrer: null,
+  funnel_version: "health-v1",
 };
 
 function probeUnavailable() {
@@ -66,7 +61,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await createMoneyHealthInsuranceScenario(SYNTHETIC_STAGING_SCENARIO);
+    const flatPayload = buildFlatHealthLeadPayload({
+      answers: SYNTHETIC_ANSWERS,
+      attribution: SYNTHETIC_ATTRIBUTION,
+      submissionId: crypto.randomUUID(),
+    });
+    const result = await createMoneyHealthInsuranceScenario(flatPayload);
     return NextResponse.json({
       ok: true,
       upstream: "money-staging",

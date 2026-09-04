@@ -77,10 +77,10 @@ The supplied provider UUID is not mapped to a health fund because the evidence d
 - exists only on Vercel Preview deployments (`VERCEL_ENV=preview`); elsewhere it returns `404`
 - refuses to run unless `MONEY_API_BASE_URL` resolves exactly to `https://api-staging.money.com.au`
 - always requires `INTERNAL_HEALTHCHECK_KEY`
-- submits one hard-coded synthetic `JUST_YOU_MALE` QLD Hospital Only scenario
+- builds one Jack Media-style flat payload from hard-coded synthetic QLD Hospital Only answers
 - uses `staging-probe@example.invalid` and ACMA-reserved fictional mobile `0491 570 156`
-- sends empty arrays where the supplied payload showed arrays
-- sends no provider account ID
+- puts current fund, requested cover type and who needs cover into `Description`
+- leaves unanswered scalar fields empty and unanswered service/rebate fields as `null`
 - returns only the opaque `acceptance_id` and its source field name on success
 - returns a capped, redacted validation issue list for `422` responses and never returns the upstream request body or OAuth token
 
@@ -136,7 +136,7 @@ POST /api/internal/money-scenario-probe
 x-internal-healthcheck-key: <INTERNAL_HEALTHCHECK_KEY>
 ```
 
-The probe intentionally uses a synthetic payload and no provider UUID. A `422` is useful evidence: record only the redacted field/message output and use it to refine the typed contract. A success response returns the generated opaque acceptance ID; verify that ID in Money Admin staging before treating the scenario creation path as confirmed. The 4 September 2026 probe observed `funnel_request_id` instead of the Admin screenshot's `scenario_id`; both are accepted and normalized. If Money returns HTTP 200 with an unknown schema, the probe returns a bounded `response_shape` summary with field names, value types and array lengths only; it never returns response values.
+The probe intentionally uses a synthetic Jack Media-style flat payload. A `422` is useful evidence: record only the redacted field/message output and use it to refine the typed contract. A success response returns the generated opaque acceptance ID; verify that ID in Money Admin staging before treating the flat-payload path as confirmed. The 4 September 2026 lower-case probe observed `funnel_request_id` instead of the Admin screenshot's `scenario_id`; both are accepted and normalized. If Money returns HTTP 200 with an unknown schema, the probe returns a bounded `response_shape` summary with field names, value types and array lengths only; it never returns response values.
 
 ## What is intentionally not wired to the public form yet
 

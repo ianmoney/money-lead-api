@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { FlatHealthLeadPayload } from "./flat-health-lead-adapter";
+
 export const MONEY_STAGING_API_BASE_URL = "https://api-staging.money.com.au";
 const TOKEN_PATH = "/oauth/token";
 const HEALTH_INSURANCE_SCENARIO_PATH = "/v1/funnels/health-insurance";
@@ -337,7 +339,7 @@ export async function getMoneyAccessToken(): Promise<{ accessToken: string; toke
 }
 
 export async function createMoneyHealthInsuranceScenario(
-  request: MoneyHealthInsuranceScenarioRequest,
+  request: MoneyHealthInsuranceScenarioRequest | FlatHealthLeadPayload,
 ): Promise<MoneyHealthInsuranceScenarioResponse> {
   const { baseUrl } = getConfig();
   const { accessToken, tokenType } = await getMoneyAccessToken();
