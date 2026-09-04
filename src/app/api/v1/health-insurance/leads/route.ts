@@ -17,6 +17,7 @@ export const dynamic = "force-dynamic";
 
 const MAX_BODY_BYTES = 32 * 1024;
 const CONSENT_VERSION_FALLBACK = "health-v1";
+const ALLOWED_CROSS_ORIGINS = new Set(["https://compare.money.com.au"]);
 
 type LeadRequest = {
   submission_id: string;
@@ -51,7 +52,7 @@ function parseRequest(value: unknown): LeadRequest | null {
   if (!requiredString(value.submission_id, 80) ||
       !isAllowed(providerOptions, lead.current_health_fund) ||
       !isAllowed(coverForOptions, lead.cover_for) ||
-      !isAllowed(genderOptions, lead.gender) ||
+      !(lead.gender === "" || isAllowed(genderOptions, lead.gender)) ||
       !isAllowed(coverTypeOptions, lead.cover_type) ||
       !isAllowed(stateOptions, lead.state) ||
       !requiredString(lead.birth_year, 4) || !/^\d{4}$/.test(lead.birth_year as string) ||
@@ -109,41 +110,62 @@ function publicError(code: string, message: string, status: number, submissionId
   return NextResponse.json({ success: false, code, message, submission_id: submissionId }, { status });
 }
 
+function addCorsHeaders(response: NextResponse, origin: string | null) {
+  if (origin && ALLOWED_CROSS_ORIGINS.has(origin)) {
+    response.headers.set("Access-Control-Allow-Origin", origin);
+    response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    response.headers.set("Access-Control-Allow-Headers", "Content-Type");
+    response.headers.set("Access-Control-Max-Age", "86400");
+    response.headers.append("Vary", "Origin");
+  }
+  return response;
+}
+
+export function OPTIONS(request: Request) {
+  const origin = request.headers.get("origin");
+  const requestOrigin = new URL(request.url).origin;
+  if (!origin || (origin !== requestOrigin && !ALLOWED_CROSS_ORIGINS.has(origin))) {
+    return new NextResponse(null, { status: 403 });
+  }
+  return addCorsHeaders(new NextResponse(null, { status: 204 }), origin);
+}
+
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
   const requestOrigin = new URL(request.url).origin;
-  if (process.env.NODE_ENV === "production" && origin !== requestOrigin) {
+  const response = (value: NextResponse) => addCorsHeaders(value, origin);
+  if (process.env.NODE_ENV === "production" && origin !== requestOrigin && !ALLOWED_CROSS_ORIGINS.has(origin || "")) {
     return publicError("ORIGIN_NOT_ALLOWED", "This submission origin is not allowed.", 403);
   }
 
   const declaredLength = Number(request.headers.get("content-length") || 0);
-  if (declaredLength > MAX_BODY_BYTES) return publicError("INVALID_REQUEST", "The request is too large.", 413);
+  if (declaredLength > MAX_BODY_BYTES) return response(publicError("INVALID_REQUEST", "The request is too large.", 413));
 
   const raw = await request.text();
-  if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) return publicError("INVALID_REQUEST", "The request is too large.", 413);
+  if (new TextEncoder().encode(raw).length > MAX_BODY_BYTES) return response(publicError("INVALID_REQUEST", "The request is too large.", 413));
   const payload = (() => { try { return JSON.parse(raw); } catch { return null; } })();
   const parsed = parseRequest(payload);
-  if (!parsed) return publicError("INVALID_REQUEST", "Check the form answers and try again.", 400);
+  if (!parsed) return response(publicError("INVALID_REQUEST", "Check the form answers and try again.", 400));
 
   const backup = initialBackupRow(parsed);
   try {
     const reservation = await reserveLeadBackup(backup);
     if (reservation.previousStatus === "MONEY_ACCEPTED" && reservation.acceptanceId) {
-      return NextResponse.json({
+      return response(NextResponse.json({
         success: true,
         submission_id: parsed.submission_id,
         acceptance_id: reservation.acceptanceId,
         acceptance_id_field: reservation.acceptanceIdField,
         backup_status: "saved",
         redirect_url: "https://www.money.com.au/health-insurance/health-thank-you",
-      });
+      }));
     }
     if (reservation.previousStatus === "PENDING_MONEY_API") {
-      return publicError("SUBMISSION_IN_PROGRESS", "This submission is already being processed. Please wait before trying again.", 409, parsed.submission_id);
+      return response(publicError("SUBMISSION_IN_PROGRESS", "This submission is already being processed. Please wait before trying again.", 409, parsed.submission_id));
     }
   } catch (error) {
     const message = error instanceof LeadBackupError ? error.message : "Lead backup is unavailable.";
-    return publicError("BACKUP_UNAVAILABLE", message, 503, parsed.submission_id);
+    return response(publicError("BACKUP_UNAVAILABLE", message, 503, parsed.submission_id));
   }
 
   try {
@@ -163,14 +185,14 @@ export async function POST(request: Request) {
     let backupStatus: "saved" | "pending" = "saved";
     try { await upsertLeadBackup(completed); } catch { backupStatus = "pending"; }
 
-    return NextResponse.json({
+    return response(NextResponse.json({
       success: true,
       submission_id: parsed.submission_id,
       acceptance_id: result.acceptance_id,
       acceptance_id_field: result.acceptance_id_field,
       backup_status: backupStatus,
       redirect_url: "https://www.money.com.au/health-insurance/health-thank-you",
-    });
+    }));
   } catch (error) {
     const apiError = error instanceof MoneyApiError
       ? error
@@ -187,6 +209,6 @@ export async function POST(request: Request) {
     try { await upsertLeadBackup(failed); } catch {}
 
     const status = apiError.code === "INVALID_REQUEST" ? 400 : apiError.code === "LEAD_REJECTED" ? 422 : 502;
-    return publicError(apiError.code, "We could not submit your quote just now. Your answers were saved; please try again.", status, parsed.submission_id);
+    return response(publicError(apiError.code, "We could not submit your quote just now. Your answers were saved; please try again.", status, parsed.submission_id));
   }
 }

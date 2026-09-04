@@ -95,10 +95,14 @@ function moneyProviderAccountId(
   return accountId || null;
 }
 
-function moneyCoverageType(coverFor: CoverFor, gender: Gender, mapping: MoneyHealthInsuranceMapping) {
+function moneyCoverageType(coverFor: CoverFor, gender: Gender | "", mapping: MoneyHealthInsuranceMapping) {
   const configured = mapping.coverageTypeByCoverFor?.[coverFor]?.trim();
   if (configured) return configured;
-  if (coverFor === "Individual") return gender === "Female" ? "JUST_YOU_FEMALE" : "JUST_YOU_MALE";
+  if (coverFor === "Individual") {
+    if (gender === "Female") return "JUST_YOU_FEMALE";
+    if (gender === "Male") return "JUST_YOU_MALE";
+    return "JUST_YOU";
+  }
   if (coverFor === "Couple") return "COUPLE";
   return "FAMILY";
 }
@@ -142,7 +146,7 @@ export function buildMoneyHealthInsuranceScenario(
   if (!isOneOf(providerOptions, answers.current_health_fund)) {
     throw new MoneyApiError("INVALID_REQUEST", "Current health fund is not supported.");
   }
-  if (!isOneOf(genderOptions, answers.gender)) {
+  if (answers.gender !== "" && !isOneOf(genderOptions, answers.gender)) {
     throw new MoneyApiError("INVALID_REQUEST", "Gender selection is not supported.");
   }
   if (!isOneOf(stateOptions, answers.state)) {
